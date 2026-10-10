@@ -3,6 +3,8 @@ import java.util.Queue;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Random;
+import java.util.List;
+import java.util.ArrayList;
 
 // ANSI Color Codes for enhanced terminal output
 class Colors {
@@ -31,6 +33,9 @@ class Process implements Runnable {
     private int remainingTime; // Time left for the process to finish its execution
 // Feature 1: Process priority field (range 1-10)
     private int priority;
+    // Feature 3: Timing metrics variables
+    private long arrivalTime;
+    private long completionTime;
     // Constructor to initialize the process with name, burst time, and time quantum
     // Feature 1: Updated constructor to accept priority
     public Process(String name, int burstTime, int timeQuantum, int priority) {
@@ -39,6 +44,8 @@ class Process implements Runnable {
         this.timeQuantum = timeQuantum;
         this.remainingTime = burstTime;
         this.priority = priority; // Feature 1: Updated priority
+        // Feature 3: Capture the initial arrival time upon process creation
+        this.arrivalTime = System.currentTimeMillis();
     }
     // Feature 1: Getter method for priority
     public int getPriority() {
@@ -91,6 +98,8 @@ class Process implements Runnable {
             System.out.println(Colors.BLUE + "  ↻ " + Colors.CYAN + name + Colors.RESET + 
                               " yields CPU for context switch" + Colors.RESET);
         } else {
+            // Feature 3: Record completion time upon process termination
+            this.completionTime = System.currentTimeMillis();
             // If no time is left, the process has finished its execution
             System.out.println(Colors.BRIGHT_GREEN + "  ✓ " + Colors.BOLD + Colors.CYAN + name + 
                               Colors.RESET + Colors.BRIGHT_GREEN + " finished execution!" + 
@@ -123,6 +132,8 @@ class Process implements Runnable {
                               Colors.RESET + " [" + remainingTime + "ms]");
             Thread.sleep(remainingTime); // Run until completion
             remainingTime = 0; // Mark the process as completed
+            // Feature 3: Record completion time upon process termination
+            this.completionTime = System.currentTimeMillis();
             System.out.println(Colors.BRIGHT_GREEN + "  ✓ " + Colors.BOLD + Colors.CYAN + name + 
                               Colors.RESET + Colors.BRIGHT_GREEN + " finished execution!" + Colors.RESET);
             System.out.println();
@@ -147,6 +158,14 @@ class Process implements Runnable {
     // Check if the process has finished (i.e., no remaining time)
     public boolean isFinished() {
         return remainingTime <= 0;
+    }
+    // Feature 3: Timing getters
+    public long getArrivalTime() { 
+        return arrivalTime; 
+    }
+
+    public long getCompletionTime() { 
+        return completionTime; 
     }
 }
 
@@ -200,6 +219,8 @@ public class SchedulerSimulation {
                           "╚═══════════════════════════════════════════════════════════════════════════════════════╝" + 
                           Colors.RESET + "\n");
         
+        // Feature 3: List to keep track of all processes for metrics
+        List<Process> allProcesses = new ArrayList<>();
         // Create 'numProcesses' number of processes
         for (int i = 1; i <= numProcesses; i++) {
             // Random burst time for each process between timeQuantum/2 and 3*timeQuantum
@@ -209,6 +230,8 @@ public class SchedulerSimulation {
             // Create a new process object with a unique name, burst time, and the defined time quantum
              Process process = new Process("P" + i, burstTime, timeQuantum, priority);
             
+             // Feature 3: Add process to the list
+            allProcesses.add(process);
             // Add the process to the ready queue and the map
             addProcessToQueue(process, processQueue, processMap);
         }
@@ -290,6 +313,31 @@ public class SchedulerSimulation {
                           // Feature 2: Print total context switches
         System.out.println(Colors.BOLD + Colors.YELLOW + "Total context switches: " + 
                           Colors.BRIGHT_WHITE + totalContextSwitches + Colors.RESET + "\n");
+
+                          // Feature 3: Performance Metrics Table
+        System.out.println(Colors.BOLD + Colors.CYAN + "═".repeat(65) + Colors.RESET);
+        System.out.printf(Colors.BOLD + Colors.YELLOW + "%-10s %-15s %-20s %-15s%n" + Colors.RESET, 
+                          "Process", "Burst Time", "Turnaround Time", "Waiting Time");
+        System.out.println(Colors.BOLD + Colors.CYAN + "─".repeat(65) + Colors.RESET);
+
+        double totalTAT = 0;
+        double totalWT = 0;
+
+        for (Process p : allProcesses) {
+            long tat = p.getCompletionTime() - p.getArrivalTime();
+            long wt = tat - p.getBurstTime();
+            if (wt < 0) wt = 0;
+            totalTAT += tat;
+            totalWT += wt;
+
+            System.out.printf("%-10s %-15d %-20d %-15d%n", 
+                              p.getName(), p.getBurstTime(), tat, wt);
+        }
+
+        System.out.println(Colors.BOLD + Colors.CYAN + "═".repeat(65) + Colors.RESET);
+        System.out.printf(Colors.BOLD + Colors.GREEN + "Average Turnaround Time: %.2f ms%n" + Colors.RESET, (totalTAT / allProcesses.size()));
+        System.out.printf(Colors.BOLD + Colors.GREEN + "Average Waiting Time:    %.2f ms%n" + Colors.RESET, (totalWT / allProcesses.size()));
+        System.out.println(Colors.BOLD + Colors.CYAN + "═".repeat(65) + Colors.RESET + "\n");
     }
     
     // Method to add a process to the queue and map, while printing a "ready" message
